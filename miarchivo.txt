@@ -1,0 +1,74 @@
+import requests
+import openai
+
+# Datos de WhatsApp Business
+whatsapp_token = "EAAQVp8ZA2BNQBO9dd6ZA5TH0lmOyWbE9MP7yvImIx0vEodnHmAyyfx59mZBAQHHvt3JwoY84m5onTiRGix5nJUR5crU0c0MB2LbaoyMhrZAg1Rt09wYPi13NZBXKIDVV2Owx2mo7iVZBZBWv2VQ5yhgYPQIsRlcoFO19dRSE5GGEZBw78kSj5DZCL5pyA3jZBDVLEWzu6ZBFeiCncMq6HUqjZCeDfmr7XK14rFrEXbumS3xTcgZDZD"
+whatsapp_phone_number_id = "640597892460269"
+
+# Datos de OpenAI
+openai.api_key = "asst_aDifF9AWKuwQxxtwHB9acAzG" #Usando el ID del asistente, no el token de la organizacion.
+openai.organization = "org-f9XKW4A7NxIURzPP7PnRjng0" #Agrego la organizacion.
+assistant_id = "asst_aDifF9AWKuwQxxtwHB9acAzG" #Reafirmo el ID del asistente.
+# Información de la organización
+organization_name = "RIV Red Inmobiliaria de Venezuela"
+
+def obtener_respuesta_fulanita(pregunta, thread_id=None):
+    """Obtiene una respuesta de Fulanita (OpenAI Assistant)."""
+    try:
+        if thread_id is None:
+            # Crear un nuevo hilo si no se proporciona uno
+            thread = openai.beta.threads.create()
+            thread_id = thread.id
+
+        # Agregar el mensaje del usuario al hilo
+        openai.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=pregunta
+        )
+
+        # Ejecutar el asistente
+        run = openai.beta.threads.runs.create(
+            thread_id=thread_id,
+            assistant_id=assistant_id
+        )
+
+        # Esperar a que se complete la ejecución
+        while True:
+            run_status = openai.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+            if run_status.status == 'completed':
+                break
+            import time
+            time.sleep(1)
+
+        # Obtener la respuesta del asistente
+        messages = openai.beta.threads.messages.list(thread_id=thread_id)
+        respuesta = messages.data[0].content[0].text.value.strip()
+
+        return respuesta, thread_id
+    except Exception as e:
+        print(f"Error al obtener respuesta de Fulanita: {e}")
+        return "Lo siento, hubo un error al procesar tu solicitud.", thread_id
+
+def enviar_mensaje_whatsapp(telefono, mensaje):
+    """Envía un mensaje de WhatsApp."""
+    url = f"https://graph.facebook.com/v22.0/{whatsapp_phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {whatsapp_token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": telefono,
+        "type": "text",
+        "text": {"body": mensaje},
+    }
+    respuesta = requests.post(url, headers=headers, json=payload)
+    return respuesta.json()
+
+# Ejemplo de uso (necesitas integrar la recepción de mensajes de whatsapp)
+pregunta_usuario = "¿Cuáles son las propiedades disponibles en Caracas?"
+respuesta_fulanita, thread_id = obtener_respuesta_fulanita(pregunta_usuario)
+respuesta_whatsapp = enviar_mensaje_whatsapp("584142492019", respuesta_fulanita)
+print(respuesta_whatsapp)
+print(f"Thread ID: {thread_id}") #Necesario para mantener la conversación.
